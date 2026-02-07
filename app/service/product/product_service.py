@@ -167,7 +167,7 @@ async def create_product(
             if upload_cloud_paths:
                 try:
                     tcb_storage_client = TCBStorageClient.get_instance()
-                    await tcb_storage_client.delete_file(cloud_path=upload_cloud_paths[0])
+                    await tcb_storage_client.delete_file(upload_cloud_paths)
                 except Exception:
                     pass
             
@@ -296,9 +296,10 @@ async def update_product(
         Dict[str, Any]: 包含 success 和 data/error 的字典
     """
     async with mysql_client.get_session() as session:
-        product = await session.execute(
+        result = await session.execute(
             select(Product).where(Product.product_id == product_id)
-        ).scalar_one_or_none()
+        )
+        product = result.scalar_one_or_none()
         
         if not product:
             return {
@@ -423,7 +424,7 @@ async def update_product(
             if upload_cloud_paths:
                 try:
                     tcb_storage_client = TCBStorageClient.get_instance()
-                    await tcb_storage_client.delete_file(cloud_path=upload_cloud_paths[0])
+                    await tcb_storage_client.delete_file(upload_cloud_paths)
                 except Exception:
                     pass
             
@@ -444,9 +445,10 @@ async def delete_product(product_id: str) -> Dict[str, Any]:
         Dict[str, Any]: 包含 success 和 error 的字典
     """
     async with mysql_client.get_session() as session:
-        product = await session.execute(
+        result = await session.execute(
             select(Product).where(Product.product_id == product_id)
-        ).scalar_one_or_none()
+        )
+        product = result.scalar_one_or_none()
         
         if not product:
             return {
@@ -454,9 +456,10 @@ async def delete_product(product_id: str) -> Dict[str, Any]:
                 "error": "商品不存在"
             }
         
-        images = await session.execute(
+        result = await session.execute(
             select(ProductImage).where(ProductImage.product_id == product_id)
-        ).scalars().all()
+        )
+        images = result.scalars().all()
         
         try:
             tcb_storage_client = TCBStorageClient.get_instance()
@@ -464,10 +467,13 @@ async def delete_product(product_id: str) -> Dict[str, Any]:
         except Exception:
             pass
         
-        for image in images:
+        if images:
+            cloud_paths = [
+                f"product/{product_id}/images/{image.image_url.split('/')[-1]}"
+                for image in images
+            ]
             try:
-                cloud_path = image.image_url.split("/")[-1]
-                await tcb_storage_client.delete_file(cloud_path=f"product/{product_id}/images/{cloud_path}")
+                await tcb_storage_client.delete_file(cloud_paths)
             except Exception:
                 pass
         

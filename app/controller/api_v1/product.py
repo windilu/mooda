@@ -446,7 +446,7 @@ async def update_product_by_id(
     return success_response(data=product_to_response(result["data"]), message="更新成功")
 
 
-@router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT, summary="删除商品", description="删除指定商品")
+@router.delete("/products/{product_id}", summary="删除商品", description="删除指定商品")
 async def delete_product_by_id(
     product_id: str,
     current_user: User = Depends(require_superuser)
@@ -462,8 +462,8 @@ async def delete_product_by_id(
     参数:
         product_id: 商品唯一标识
 
-    HTTP 状态码:
-        204 No Content - 删除成功
+    返回:
+        success_response: 删除成功时返回成功响应
 
     异常:
         HTTPException: 商品不存在时抛出（404 Not Found）
@@ -476,3 +476,5 @@ async def delete_product_by_id(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=result["error"]
         )
+    
+    return success_response(data=result["data"], message="删除成功")

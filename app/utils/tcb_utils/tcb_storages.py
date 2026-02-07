@@ -2,7 +2,7 @@ import httpx
 import json
 import os
 import inspect
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from datetime import datetime, timezone, timedelta
 
 from app.utils.enum import RedisKey
@@ -393,28 +393,42 @@ class TCBStorageClient:
             "data": {"local_path": local_path}
         }
 
-    async def delete_file(self, cloud_path: str) -> Dict[str, Any]:
+    async def delete_file(self, cloud_paths: Union[str, List[str]]) -> Dict[str, Any]:
         """
-        删除文件
+        删除文件（支持批量删除）
 
-        从腾讯云存储删除指定文件。
+        从腾讯云存储删除指定文件，支持单个或批量删除。
 
         参数:
-            cloud_path: 云端文件路径（如：images/photo.jpg）
+            cloud_paths: 云端文件路径（单个字符串或字符串列表）
+                      如："images/photo.jpg" 或 ["images/photo1.jpg", "images/photo2.jpg"]
 
         返回:
-            Dict[str, Any]: 包含 success 和 error 的字典
+            Dict[str, Any]: 包含 success 和 data/error 的字典
 
         示例:
             >>> client = TCBStorageClient()
+            >>> # 删除单个文件
             >>> result = await client.delete_file("images/photo.jpg")
             >>> print(result)
-            {"success": True, "data": {}}
+            {"success": True, "data": {"deleted": 1, "failed": 0}}
+            >>> 
+            >>> # 批量删除文件
+            >>> result = await client.delete_file(["images/photo1.jpg", "images/photo2.jpg"])
+            >>> print(result)
+            {"success": True, "data": {"deleted": 2, "failed": 0}}
         """
         await self._ensure_authenticated()
 
         url = self.API_ENDPOINTS['delete']
-        payload = {'path': cloud_path}
+        
+        if isinstance(cloud_paths, str):
+            cloud_paths = [cloud_paths]
+        
+        payload = [
+            {"cloudObjectId": f"cloud://{ENV_ID}.bucket/{path}"}
+            for path in cloud_paths
+        ]
         
         client = await self._get_http_client()
         response = await client.post(url, headers=self._get_headers(), json=payload)
@@ -430,7 +444,10 @@ class TCBStorageClient:
         
         return {
             "success": True,
-            "data": {}
+            "data": {
+                "deleted": len(cloud_paths),
+                "failed": 0
+            }
         }
 
     async def list_files(

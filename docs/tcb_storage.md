@@ -35,7 +35,7 @@ client = TCBStorageClient()
 |------|------|------|------|
 | `upload_file()` | 上传文件 | cloud_path, file/local_path, on_progress | Dict |
 | `download_file()` | 下载文件 | cloud_path, local_path, on_progress | Dict |
-| `delete_file()` | 删除文件 | cloud_path | Dict |
+| `delete_file()` | 删除文件（支持批量） | cloud_paths（单个字符串或列表） | Dict |
 | `list_files()` | 列出文件 | cloud_path, limit | Dict |
 | `get_file_info()` | 获取文件信息 | cloud_path | Dict |
 | `close()` | 关闭客户端 | 无 | None |
@@ -124,22 +124,36 @@ else:
 #### 3. 删除文件
 
 ```python
-result = await client.delete_file(cloud_path="images/photo.jpg")
+# 删除单个文件
+result = await client.delete_file("images/photo.jpg")
 
 if result["success"]:
     print("删除成功")
 else:
     print("删除失败", result["error"])
+
+# 批量删除文件
+result = await client.delete_file(["images/photo1.jpg", "images/photo2.jpg"])
+
+if result["success"]:
+    print(f"批量删除成功，共删除 {result['data']['deleted']} 个文件")
+else:
+    print("批量删除失败", result["error"])
 ```
 
 **参数：**
-- `cloud_path`: 云端文件路径（如：`images/photo.jpg`）
+- `cloud_paths`: 云端文件路径（单个字符串或字符串列表）
+  - 单个文件：`"images/photo.jpg"`
+  - 批量文件：`["images/photo1.jpg", "images/photo2.jpg"]`
 
 **返回：**
 ```python
 {
     "success": True,
-    "data": {}
+    "data": {
+        "deleted": 2,
+        "failed": 0
+    }
 }
 ```
 
@@ -313,16 +327,15 @@ async def list_and_delete():
         files = list_result["data"].get("files", [])
         print("文件列表", files)
         
-        # 删除所有文件
+        # 批量删除所有文件
         if files:
-            for file in files:
-                path = file["path"]
-                delete_result = await client.delete_file(cloud_path=path)
-                
-                if delete_result["success"]:
-                    print(f"删除成功：{path}")
-                else:
-                    print(f"删除失败：{path}", delete_result["error"])
+            paths = [file["path"] for file in files]
+            delete_result = await client.delete_file(paths)
+            
+            if delete_result["success"]:
+                print(f"批量删除成功，共删除 {delete_result['data']['deleted']} 个文件")
+            else:
+                print("批量删除失败", delete_result["error"])
         
     finally:
         await client.close()
